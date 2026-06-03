@@ -32,6 +32,10 @@ while cap.isOpened():
 
     mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel, iterations=1)
 
+    contours, _ = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+
+    cv.drawContours(frame, contours, -1, (0, 255, 0), 3)
+
     cv.imshow("Frame", frame)
     cv.imshow("Grey", grey)
     cv.imshow("grey_diff", grey_diff)
