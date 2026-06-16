@@ -2,6 +2,8 @@ import cv2 as cv
 import numpy as np
 import tkinter as tk
 import bcrypt
+import sqlite3
+from os.path import isfile
 
 class Window:
     def __init__(self, size="800x600"):
@@ -55,9 +57,16 @@ class ImageProcessing:
             cv.imshow("Frame", frame)
 
 class DBConnector:
-    def __init__(self):
-        pass
+    def __init__(self, create=False):
+        self.con=sqlite3.connect("MotionRecordingApp.db")
+        self.cursor=self.con.cursor
     
+    def createTables(self):
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS users(
+                        username varchar PRIMARY KEY,
+                        password varchar NOT NULL,
+                        );""")
+
     def checkAuth(self, user, pass_hash):
         pass
 
