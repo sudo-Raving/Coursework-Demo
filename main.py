@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
 import tkinter as tk
+import bcrypt
 
 class Window:
     def __init__(self, size="800x600"):
@@ -12,19 +13,25 @@ class LoginWindow(Window):
     def __init__(self):
         super().__init__()
         self.active = True
-        tk.Label(self.window, text="Login", font=("Arial",20)).pack()
-        tk.Label(self.window, text="Username").pack()
+        tk.Label(self.window, text="Login", font=("Arial",20)).grid(row=0, column=10)
+        tk.Label(self.window, text="Username").grid(row=1, column=9)
         self.user_entry = tk.Entry(self.window, font=('calibre',10,'normal'))
-        self.user_entry.pack()
-        tk.Label(self.window, text="Password").pack()
+        self.user_entry.grid(row=1, column=10)
+        tk.Label(self.window, text="Password").grid(row=2, column=9)
         self.passw_entry = tk.Entry(self.window, font = ('calibre',10,'normal'), show = '*')
-        self.passw_entry.pack()
+        self.passw_entry.grid(row=2, column=10)
         self.login = tk.Button(self.window, text="Login", font=("Arial", 16), command=self.auth(self.user_entry.get(), self.passw_entry.get()))
-        self.login.pack()
+        self.login.grid(row=3, column=2)
         self.window.mainloop()
 
     def auth(self, username, password):
         db = DBConnector()
+        if db.checkAuth(username, bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())):
+            main = MainWindow
+            self.active = False
+        else:
+            pass
+            # Show that the password is incorrect
 
 
 
@@ -48,6 +55,10 @@ class ImageProcessing:
             cv.imshow("Frame", frame)
 
 class DBConnector:
-    pass
+    def __init__(self):
+        pass
+    
+    def checkAuth(self, user, pass_hash):
+        pass
 
 login = LoginWindow()
