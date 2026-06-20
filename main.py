@@ -16,25 +16,25 @@ class LoginWindow(Window):
     def __init__(self):
         super().__init__()
         self.active = True
-        tk.Label(self.window, text="Login", font=("Arial",20)).place(relx=0.5,rely=0.10,relwidth=0.5,relheight=0.08,anchor="center")
+        tk.Label(self.window, text="Login Window", font=("Arial",20)).place(relx=0.5,rely=0.10,relwidth=0.5,relheight=0.08,anchor="center")
         tk.Label(self.window, text="Username").place(relx=0.5,rely=0.20,anchor="center")
         self.user_entry = tk.Entry(self.window, font=('calibre',10,'normal'))
         self.user_entry.place(relx=0.5,rely=0.25,anchor="center")
         tk.Label(self.window, text="Password").place(relx=0.5,rely=0.30,anchor="center")
         self.passw_entry = tk.Entry(self.window, font = ('calibre',10,'normal'), show = '*')
         self.passw_entry.place(relx=0.5,rely=0.35,anchor="center")
-        self.login = tk.Button(self.window, text="Login", font=("Arial", 16), command=self.auth(self.user_entry.get(), self.passw_entry.get()))
+        self.login = tk.Button(self.window, text="Login", font=("Arial", 16), command=self.auth)
         self.login.place(relx=0.5,rely=0.45,anchor="center")
         self.window.mainloop()
 
-    def auth(self, username, password):
+    def auth(self):
         db = DBConnector()
-        if db.checkAuth(username, bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())):
-            main = MainWindow
-            self.active = False
+        if db.checkAuth(self.user_entry.get(), self.passw_entry.get()):
+            self.window.destroy()
+            global main
+            main = MainWindow()
         else:
-            pass
-            # Show that the password is incorrect
+            print("Incorrect login")
 
 
 
@@ -91,7 +91,7 @@ class ImageProcessing:
         self.checkMovement(grey_diff)
 
         mask = cv.adaptiveThreshold(grey_diff, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C,cv.THRESH_BINARY_INV, 11, 3)
-        mask = cv.medianBlur(mask, 3)
+        mask = cv.medianBlur(mask, 5)
         mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel, iterations=1)
 
         contours, _ = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
@@ -102,27 +102,48 @@ class ImageProcessing:
         return final_img
     
     def checkMovement(self, grey_arr):
-        if np.count_nonzero(grey_arr) > 500:
-            print("Movement detected")
+        if np.count_nonzero(grey_arr) > 60000:
+            db = DBConnector()
         else:
             print("No movement")
     
 
 
 class DBConnector:
-    def __init__(self, create=False):
+    def __init__(self):
         self.con=sqlite3.connect("MotionRecordingApp.db")
-        self.cursor=self.con.cursor
-        if create:
-            self.createTables()
+        self.cursor=self.con.cursor()
     
     def createTables(self):
         self.cursor.execute("""CREATE TABLE IF NOT EXISTS users(
                         username varchar PRIMARY KEY,
-                        password varchar NOT NULL,
+                        password varchar NOT NULL
                         );""")
 
-    def checkAuth(self, user, pass_hash):
+        self.cursor.execute("INSERT INTO users(username,password) VALUES (?,?)",("admin", bcrypt.hashpw(b"admin", bcrypt.gensalt())))
+
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS users(
+                        event_id varchar PRIMARY KEY,
+                        time datetime NOT NULL,
+                        cam_id int NOT NULL,
+                        vid_name varchar NOT NULL
+                        );""")
+        
+        self.con.commit()
+    
+    def addEvent(self):
         pass
 
-main = MainWindow()
+
+    def checkAuth(self, user, password):
+        query = f"SELECT password FROM users WHERE username = \'{user}\'"
+        output = self.cursor.execute(query)
+        for record in output:
+            for item in record:
+                pass_hash = item
+        
+        password = password.encode('utf-8')
+
+        return (bcrypt.checkpw(password,pass_hash))
+
+login = LoginWindow()
