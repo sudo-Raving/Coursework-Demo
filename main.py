@@ -1,10 +1,14 @@
 import cv2 as cv
 import numpy as np
 import tkinter as tk
+from tkinter import ttk
 import bcrypt
 import sqlite3
+from datetime import datetime
 from os.path import isfile
 from PIL import Image, ImageTk
+import random
+import string
 
 class Window:
     def __init__(self, size="800x600"):
@@ -44,9 +48,26 @@ class MainWindow(Window):
         self.camstream = ImageProcessing()
         self.imageLabel = tk.Label(self.window)
         self.imageLabel.pack()
-        self.camLoop()
         self.cambutton = tk.Button(self.window, text="Camera on")
         self.cambutton.pack()
+        self.table = ttk.Treeview(self.window)
+        self.table['columns'] = ('EventID', 'Timestamp', 'CamID', 'Vid_Name')
+        self.table.column('#0', width=0, stretch=tk.NO)
+        self.table.column('EventID', anchor=tk.W, width=200)
+        self.table.column('Timestamp', anchor=tk.W, width=200)
+        self.table.column('CamID', anchor=tk.W, width=100)
+        self.table.column('Vid_Name', anchor=tk.W, width=200)
+
+        # Create the headings
+        self.table.heading('#0', text='', anchor=tk.W)
+        self.table.heading('EventID', text='EventID', anchor=tk.W)
+        self.table.heading('Timestamp', text='Timestamp', anchor=tk.W)
+        self.table.heading('CamID', text='CamID', anchor=tk.W)
+        self.table.heading('Vid_Name', text='Vid_Name', anchor=tk.W)
+        self.table.pack()
+
+        self.window.after(0,self.camLoop)
+
         self.window.mainloop()
 
     def camLoop(self):
@@ -66,6 +87,14 @@ class adminWindow(Window):
 class ImageProcessing:
     def __init__(self):
         self.cap = cv.VideoCapture(0)
+        
+        self.recording = False
+
+        self.filename = None
+
+        self.frame_width = int(self.cap.get(3))
+        self.frame_height = int(self.cap.get(4))
+        self.fourcc = cv.VideoWriter_fourcc(*'XVID') 
 
     def displayCap(self):
         ret, frame_last = self.cap.read()
@@ -97,15 +126,43 @@ class ImageProcessing:
         contours, _ = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         cv.drawContours(frame, contours, -1, (0, 255, 0), 3)
 
-        final_img = cv.cvtColor(frame, cv.COLOR_BGR2RGBA)
+        self.final_img = cv.cvtColor(frame, cv.COLOR_BGR2RGBA)
 
-        return final_img
+        return self.final_img
     
     def checkMovement(self, grey_arr):
-        if np.count_nonzero(grey_arr) > 60000:
-            db = DBConnector()
+        if np.count_nonzero(grey_arr) > 100000:
+            self.record(True)
         else:
-            print("No movement")
+            self.record()
+
+
+    def record(self,movement = False):
+
+        if movement and not self.recording:
+            self.recording = True
+            self.startTime = datetime.now()
+            self.filename = "output1.avi"
+            while isfile(self.filename):
+                self.filename = self.filename[:6] + str(int(self.filename[6]) + 1) + ".avi"
+            self.out = cv.VideoWriter(self.filename, self.fourcc, 16, (self.frame_width, self.frame_height))
+            print("Start recording")
+            
+        elif (datetime.now() - self.startTime).total_seconds() < 10:
+            self.out.write(cv.cvtColor(self.final_img, cv.COLOR_RGBA2BGR))
+            print("Recording")
+
+        else:
+            if self.recording:
+                print("End recording")
+                db = DBConnector()
+                db.addEvent("".join(random.choices(string.ascii_letters + string.digits,k=8)), self.startTime, 0, self.filename)
+                self.recording = False
+                self.out.release()
+            else:
+                print("Not recording")
+
+
     
 
 
@@ -120,19 +177,32 @@ class DBConnector:
                         password varchar NOT NULL
                         );""")
 
-        self.cursor.execute("INSERT INTO users(username,password) VALUES (?,?)",("admin", bcrypt.hashpw(b"admin", bcrypt.gensalt())))
+        # self.cursor.execute("INSERT INTO users(username,password) VALUES (?,?)",("admin", bcrypt.hashpw(b"admin", bcrypt.gensalt())))
 
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS users(
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS events(
                         event_id varchar PRIMARY KEY,
-                        time datetime NOT NULL,
-                        cam_id int NOT NULL,
+                        time timestamp NOT NULL,
+                        cam_id integer NOT NULL,
                         vid_name varchar NOT NULL
                         );""")
         
         self.con.commit()
     
-    def addEvent(self):
-        pass
+    def addEvent(self, event_id, timestamp, cam_id, vid_name):
+        self.cursor.execute("INSERT INTO events(event_id, time, cam_id, vid_name) VALUES (?,?,?,?)", (event_id, timestamp.strftime("%Y-%m-%d %H:%M:%S"), cam_id, vid_name))
+
+        self.con.commit()
+
+    def removeEvent(self, event_id):
+        self.cursor.execute(f"DELETE FROM events WHERE event_id = \'{event_id}\'")
+        
+        self.con.commit()
+
+    def selectAllEvents(self):
+        query = "SELECT * FROM events"
+        output = self.cursor.execute(query)
+        for record in output:
+            print(record)
 
 
     def checkAuth(self, user, password):
@@ -146,4 +216,7 @@ class DBConnector:
 
         return (bcrypt.checkpw(password,pass_hash))
 
-login = LoginWindow()
+db = DBConnector()
+db.selectAllEvents()
+db.removeEvent("G34ZRCzG")
+db.selectAllEvents()

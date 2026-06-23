@@ -1,4 +1,5 @@
 Documentation.docx
 .venv
 SampleClip1.avi
-MotionRecordingApp.db
+*.db
+*.avi
