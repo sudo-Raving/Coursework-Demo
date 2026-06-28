@@ -65,6 +65,7 @@ class MainWindow(Window):
         self.table.heading('CamID', text='CamID', anchor=tk.W)
         self.table.heading('Vid_Name', text='Vid_Name', anchor=tk.W)
         self.table.pack()
+        self.refreshTable()
 
         self.window.after(0,self.camLoop)
 
@@ -75,6 +76,22 @@ class MainWindow(Window):
         self.imageLabel.photo_image = tkFrame
         self.imageLabel.configure(image=tkFrame)
         self.window.after(50, self.camLoop)
+
+    def refreshTable(self):
+        self.table.delete(*self.table.get_children())
+        db = DBConnector()
+        for record in db.selectAllEvents():
+            print(record)
+            self.table.insert(
+                "",
+                tk.END,
+                values=(
+                    record[1],
+                    record[2],
+                    record[3],
+                    record[4],
+                ),
+            )
 
     def openSettings(self):
         pass
@@ -91,6 +108,7 @@ class ImageProcessing:
         self.recording = False
 
         self.filename = None
+
 
         self.frame_width = int(self.cap.get(3))
         self.frame_height = int(self.cap.get(4))
@@ -148,7 +166,7 @@ class ImageProcessing:
             self.out = cv.VideoWriter(self.filename, self.fourcc, 16, (self.frame_width, self.frame_height))
             print("Start recording")
             
-        elif (datetime.now() - self.startTime).total_seconds() < 10:
+        elif (datetime.now() - self.startTime).total_seconds() < 10 and self.recording:
             self.out.write(cv.cvtColor(self.final_img, cv.COLOR_RGBA2BGR))
             print("Recording")
 
@@ -159,6 +177,7 @@ class ImageProcessing:
                 db.addEvent("".join(random.choices(string.ascii_letters + string.digits,k=8)), self.startTime, 0, self.filename)
                 self.recording = False
                 self.out.release()
+                return True
             else:
                 print("Not recording")
 
@@ -177,10 +196,11 @@ class DBConnector:
                         password varchar NOT NULL
                         );""")
 
-        # self.cursor.execute("INSERT INTO users(username,password) VALUES (?,?)",("admin", bcrypt.hashpw(b"admin", bcrypt.gensalt())))
+        self.cursor.execute("INSERT INTO users(username,password) VALUES (?,?)",("admin", bcrypt.hashpw(b"admin", bcrypt.gensalt())))
 
         self.cursor.execute("""CREATE TABLE IF NOT EXISTS events(
-                        event_id varchar PRIMARY KEY,
+                        num integer PRIMARY KEY AUTOINCREMENT,
+                        event_id varchar NOT NULL,
                         time timestamp NOT NULL,
                         cam_id integer NOT NULL,
                         vid_name varchar NOT NULL
@@ -201,8 +221,7 @@ class DBConnector:
     def selectAllEvents(self):
         query = "SELECT * FROM events"
         output = self.cursor.execute(query)
-        for record in output:
-            print(record)
+        return output
 
 
     def checkAuth(self, user, password):
@@ -216,7 +235,4 @@ class DBConnector:
 
         return (bcrypt.checkpw(password,pass_hash))
 
-db = DBConnector()
-db.selectAllEvents()
-db.removeEvent("G34ZRCzG")
-db.selectAllEvents()
+main = MainWindow()
