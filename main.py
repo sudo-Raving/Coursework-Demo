@@ -6,6 +6,7 @@ import bcrypt
 import sqlite3
 from datetime import datetime
 from os.path import isfile
+import os
 from PIL import Image, ImageTk
 import random
 import string
@@ -48,8 +49,8 @@ class MainWindow(Window):
         self.camstream = ImageProcessing()
         self.imageLabel = tk.Label(self.window)
         self.imageLabel.pack()
-        self.cambutton = tk.Button(self.window, text="Camera on")
-        self.cambutton.pack()
+        self.delbutton = tk.Button(self.window, text="Delete clip", command=self.deleteClip)
+        self.delbutton.pack()
         self.table = ttk.Treeview(self.window)
         self.table['columns'] = ('EventID', 'Timestamp', 'CamID', 'Vid_Name')
         self.table.column('#0', width=0, stretch=tk.NO)
@@ -75,13 +76,21 @@ class MainWindow(Window):
         frame, tkFrame = self.camstream.displayCap()
         self.imageLabel.photo_image = tkFrame
         self.imageLabel.configure(image=tkFrame)
+        if self.camstream.refresh:
+            self.refreshTable()
         self.window.after(50, self.camLoop)
+    
+    def deleteClip(self):
+        db = DBConnector()
+        curItem = self.table.focus()
+        db.removeEvent(self.table.item(curItem)['values'][0])
+        os.remove(self.table.item(curItem)['values'][3])
+        self.refreshTable()
 
     def refreshTable(self):
         self.table.delete(*self.table.get_children())
         db = DBConnector()
         for record in db.selectAllEvents():
-            print(record)
             self.table.insert(
                 "",
                 tk.END,
@@ -106,7 +115,7 @@ class ImageProcessing:
         self.cap = cv.VideoCapture(0)
         
         self.recording = False
-
+        self.refresh = False
         self.filename = None
 
 
@@ -156,6 +165,7 @@ class ImageProcessing:
 
 
     def record(self,movement = False):
+        self.refresh = False
 
         if movement and not self.recording:
             self.recording = True
@@ -176,8 +186,8 @@ class ImageProcessing:
                 db = DBConnector()
                 db.addEvent("".join(random.choices(string.ascii_letters + string.digits,k=8)), self.startTime, 0, self.filename)
                 self.recording = False
+                self.refresh = True
                 self.out.release()
-                return True
             else:
                 print("Not recording")
 
