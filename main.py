@@ -268,14 +268,19 @@ class DBConnector:
 
 
     def checkAuth(self, user, password):
+        exist = False
         query = f"SELECT password FROM users WHERE username = \'{user}\'"
         output = self.cursor.execute(query)
         for record in output:
             for item in record:
                 pass_hash = item
+                exist = True
         
         password = password.encode('utf-8')
-
-        return (bcrypt.checkpw(password,pass_hash))
+        
+        if exist:
+            return (bcrypt.checkpw(password,pass_hash))
+        else:
+            return False
 
 login = LoginWindow()
