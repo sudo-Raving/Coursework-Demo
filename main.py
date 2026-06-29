@@ -20,7 +20,6 @@ class Window:
 class LoginWindow(Window):
     def __init__(self):
         super().__init__()
-        self.active = True
         tk.Label(self.window, text="Login Window", font=("Arial",20)).place(relx=0.5,rely=0.10,relwidth=0.5,relheight=0.08,anchor="center")
         tk.Label(self.window, text="Username").place(relx=0.5,rely=0.20,anchor="center")
         self.user_entry = tk.Entry(self.window, font=('calibre',10,'normal'))
@@ -49,8 +48,12 @@ class MainWindow(Window):
         self.camstream = ImageProcessing()
         self.imageLabel = tk.Label(self.window)
         self.imageLabel.pack()
+
         self.delbutton = tk.Button(self.window, text="Delete clip", command=self.deleteClip)
         self.delbutton.pack()
+        self.replaybutton = tk.Button(self.window, text="Play clip")
+        self.replaybutton.pack()
+
         self.table = ttk.Treeview(self.window)
         self.table['columns'] = ('EventID', 'Timestamp', 'CamID', 'Vid_Name')
         self.table.column('#0', width=0, stretch=tk.NO)
@@ -66,7 +69,10 @@ class MainWindow(Window):
         self.table.heading('CamID', text='CamID', anchor=tk.W)
         self.table.heading('Vid_Name', text='Vid_Name', anchor=tk.W)
         self.table.pack()
+
         self.refreshTable()
+
+        self.broken = False
 
         self.window.after(0,self.camLoop)
 
@@ -78,7 +84,16 @@ class MainWindow(Window):
         self.imageLabel.configure(image=tkFrame)
         if self.camstream.refresh:
             self.refreshTable()
-        self.window.after(50, self.camLoop)
+
+        if not self.broken:
+            self.window.after(50, self.camLoop)
+
+        else:
+            self.vidLoop()
+    
+    def vidLoop(self):
+        vid = VideoPlayer()
+        vid.playVideo()
     
     def deleteClip(self):
         db = DBConnector()
@@ -117,6 +132,7 @@ class ImageProcessing:
         self.recording = False
         self.refresh = False
         self.filename = None
+        self.startTime = datetime.now()
 
 
         self.frame_width = int(self.cap.get(3))
@@ -170,9 +186,11 @@ class ImageProcessing:
         if movement and not self.recording:
             self.recording = True
             self.startTime = datetime.now()
-            self.filename = "output1.avi"
+            self.filename = "output.avi"
+            i = 1
             while isfile(self.filename):
-                self.filename = self.filename[:6] + str(int(self.filename[6]) + 1) + ".avi"
+                self.filename = f"output{i}.avi"
+                i += 1
             self.out = cv.VideoWriter(self.filename, self.fourcc, 16, (self.frame_width, self.frame_height))
             print("Start recording")
             
@@ -192,7 +210,22 @@ class ImageProcessing:
                 print("Not recording")
 
 
-    
+class VideoPlayer:
+    def __init__(self):
+        pass
+
+    def playVideo(self, videoname):
+        self.cap = cv.VideoCapture(videoname)
+
+    def vidLoop(self):
+        self.ret, frame = self.cap.read()
+
+        workingImage = Image.fromarray(frame)
+        workingImage = workingImage.resize((640,480))
+        tkFrame = ImageTk.PhotoImage(image=workingImage)
+
+        return tkFrame
+
 
 
 class DBConnector:
@@ -245,4 +278,4 @@ class DBConnector:
 
         return (bcrypt.checkpw(password,pass_hash))
 
-main = MainWindow()
+login = LoginWindow()
